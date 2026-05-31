@@ -14,6 +14,8 @@ import { TripMap, type MapMarker, type MapLeg } from '../components/TripMap';
 import { MapLegend } from '../components/MapLegend';
 import { AddPlaceForm } from '../components/AddPlaceForm';
 import { CitiesList } from '../components/CitiesList';
+import { RoutesList, type RouteStop } from '../components/RoutesList';
+import { TabbedPanel } from '../components/TabbedPanel';
 import { CityDetailPanel } from '../components/CityDetailPanel';
 import { SharePanel } from '../components/SharePanel';
 import { AIChatPanel } from '../components/AIChatPanel';
@@ -106,26 +108,42 @@ export function TripPlannerPage() {
     }
   };
 
-  const setInterLeg = async (
+  const createInterLeg = async (
     fromCityId: string,
     toCityId: string,
-    patch: { transportMode?: TransportMode; cost?: number },
-    existingLegId?: string
+    transportMode: TransportMode,
+    cost?: number
   ) => {
     try {
-      if (existingLegId) {
-        const updated = await api.updateInterLeg(trip.id, existingLegId, patch);
-        setTrip(updated);
-      } else if (patch.transportMode) {
-        const updated = await api.setInterLeg(
-          trip.id,
-          fromCityId,
-          toCityId,
-          patch.transportMode,
-          patch.cost
-        );
-        setTrip(updated);
-      }
+      const updated = await api.setInterLeg(
+        trip.id,
+        fromCityId,
+        toCityId,
+        transportMode,
+        cost
+      );
+      setTrip(updated);
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  };
+
+  const updateInterLeg = async (
+    legId: string,
+    patch: { transportMode?: TransportMode; cost?: number }
+  ) => {
+    try {
+      const updated = await api.updateInterLeg(trip.id, legId, patch);
+      setTrip(updated);
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  };
+
+  const deleteInterLeg = async (legId: string) => {
+    try {
+      const updated = await api.deleteInterLeg(trip.id, legId);
+      setTrip(updated);
     } catch (e: any) {
       toast.error(e.message);
     }
@@ -260,21 +278,58 @@ export function TripPlannerPage() {
               onAdd={(p) => addCity(p)}
             />
           )}
-          <CitiesList
-            trip={trip}
-            canEdit={canEdit}
-            selectedCityId={selectedCityId}
-            onSelectCity={setSelectedCityId}
-            onChangeInterLeg={setInterLeg}
-            onReorder={async (order) => {
-              try {
-                const updated = await api.reorderCities(trip.id, order);
-                setTrip(updated);
-                toast.success('Cities reordered');
-              } catch (e: any) {
-                toast.error(e.message);
-              }
-            }}
+          <TabbedPanel
+            tabs={[
+              {
+                key: 'cities',
+                label: 'Cities',
+                badge: trip.cities.length,
+                content: (
+                  <CitiesList
+                    trip={trip}
+                    canEdit={canEdit}
+                    selectedCityId={selectedCityId}
+                    onSelectCity={setSelectedCityId}
+                    onReorder={async (order) => {
+                      try {
+                        const updated = await api.reorderCities(trip.id, order);
+                        setTrip(updated);
+                        toast.success('Cities reordered');
+                      } catch (e: any) {
+                        toast.error(e.message);
+                      }
+                    }}
+                  />
+                ),
+              },
+              {
+                key: 'routes',
+                label: 'Routes',
+                badge: trip.legs.length,
+                content: (
+                  <RoutesList
+                    emptyHint="No routes yet. Add one to plan how you'll travel between cities."
+                    stops={trip.cities.map<RouteStop>((c) => ({
+                      id: c.id,
+                      number: c.cityNumber,
+                      label: c.name,
+                    }))}
+                    routes={trip.legs.map((l) => ({
+                      id: l.id,
+                      fromId: l.fromCityId,
+                      toId: l.toCityId,
+                      transportMode: l.transportMode,
+                      cost: l.cost,
+                    }))}
+                    canEdit={canEdit}
+                    currency={trip.currency || 'EUR'}
+                    onCreate={createInterLeg}
+                    onUpdate={updateInterLeg}
+                    onDelete={deleteInterLeg}
+                  />
+                ),
+              },
+            ]}
           />
         </aside>
 

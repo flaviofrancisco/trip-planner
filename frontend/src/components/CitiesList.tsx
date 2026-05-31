@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Calendar, GripVertical, MapPin } from 'lucide-react';
 import {
@@ -18,9 +18,8 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { City, InterLeg, TransportMode, Trip } from '../types';
-import { TRANSPORT_STYLES } from '../constants';
-import { currencySymbol, formatMoney } from '../utils/currency';
+import type { City, Trip } from '../types';
+import { formatMoney } from '../utils/currency';
 import { formatVisitAt } from '../utils/date';
 
 export function CitiesList({
@@ -28,22 +27,14 @@ export function CitiesList({
   canEdit,
   selectedCityId,
   onSelectCity,
-  onChangeInterLeg,
   onReorder,
 }: {
   trip: Trip;
   canEdit: boolean;
   selectedCityId?: string;
   onSelectCity: (cityId: string) => void;
-  onChangeInterLeg: (
-    fromCityId: string,
-    toCityId: string,
-    patch: { transportMode?: TransportMode; cost?: number },
-    existingLegId?: string
-  ) => Promise<void>;
   onReorder: (order: string[]) => Promise<void>;
 }) {
-  const currency = trip.currency || 'EUR';
   const [items, setItems] = useState<City[]>(trip.cities);
 
   useEffect(() => {
@@ -53,11 +44,6 @@ export function CitiesList({
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  );
-
-  const legByPair = new Map<string, InterLeg>();
-  trip.legs.forEach((l) =>
-    legByPair.set(`${l.fromCityId}->${l.toCityId}`, l)
   );
 
   const onDragEnd = async (e: DragEndEvent) => {
@@ -73,9 +59,9 @@ export function CitiesList({
 
   if (items.length === 0) {
     return (
-      <div className="card p-6 text-sm text-slate-500 text-center">
+      <div className="text-sm text-slate-500 text-center py-4">
         <MapPin className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-        Add the cities you plan to visit on the left.
+        Add the cities you plan to visit using the form above.
       </div>
     );
   }
@@ -84,9 +70,7 @@ export function CitiesList({
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
       <SortableContext items={items.map((c) => c.id)} strategy={verticalListSortingStrategy}>
         <div className="space-y-2">
-          {items.map((city, idx) => {
-            const next = items[idx + 1];
-            const leg = next ? legByPair.get(`${city.id}->${next.id}`) : null;
+          {items.map((city) => {
             const cityCost =
               city.attractions.reduce(
                 (s, a) => s + (a.isFree ? 0 : Number(a.cost) || 0),
@@ -94,26 +78,15 @@ export function CitiesList({
               ) +
               city.legs.reduce((s, l) => s + (Number(l.cost) || 0), 0);
             return (
-              <Fragment key={city.id}>
-                <SortableCityCard
-                  trip={trip}
-                  city={city}
-                  cityCost={cityCost}
-                  selected={city.id === selectedCityId}
-                  canEdit={canEdit}
-                  onClick={() => onSelectCity(city.id)}
-                />
-                {next && (
-                  <InterTransportRow
-                    leg={leg ?? undefined}
-                    currency={currency}
-                    canEdit={canEdit}
-                    onChange={(patch) =>
-                      onChangeInterLeg(city.id, next.id, patch, leg?.id)
-                    }
-                  />
-                )}
-              </Fragment>
+              <SortableCityCard
+                key={city.id}
+                trip={trip}
+                city={city}
+                cityCost={cityCost}
+                selected={city.id === selectedCityId}
+                canEdit={canEdit}
+                onClick={() => onSelectCity(city.id)}
+              />
             );
           })}
         </div>
@@ -210,105 +183,6 @@ function SortableCityCard({
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function InterTransportRow({
-  leg,
-  currency,
-  canEdit,
-  onChange,
-}: {
-  leg?: InterLeg;
-  currency: string;
-  canEdit: boolean;
-  onChange: (patch: {
-    transportMode?: TransportMode;
-    cost?: number;
-  }) => Promise<void>;
-}) {
-  return (
-    <div className="flex items-center gap-2 pl-3 pr-1 py-1 my-1">
-      <div className="text-slate-400 text-xs flex-shrink-0">
-        <ArrowRight className="w-3.5 h-3.5" />
-      </div>
-      <select
-        className="input py-1 text-xs flex-1 min-w-0"
-        value={leg?.transportMode ?? ''}
-        disabled={!canEdit}
-        onChange={(e) => {
-          const mode = e.target.value as TransportMode;
-          if (!mode) return;
-          onChange({ transportMode: mode });
-        }}
-      >
-        <option value="">— transport —</option>
-        {Object.entries(TRANSPORT_STYLES).map(([key, s]) => (
-          <option key={key} value={key}>
-            {s.emoji} {s.label}
-          </option>
-        ))}
-      </select>
-      <LegCostInput
-        legId={leg?.id}
-        cost={leg?.cost ?? 0}
-        canEdit={canEdit && !!leg}
-        currency={currency}
-        onChange={(c) => onChange({ cost: c })}
-      />
-    </div>
-  );
-}
-
-function LegCostInput({
-  legId,
-  cost,
-  canEdit,
-  currency,
-  onChange,
-}: {
-  legId: string | undefined;
-  cost: number;
-  canEdit: boolean;
-  currency: string;
-  onChange: (cost: number) => void;
-}) {
-  const [value, setValue] = useState<string>(cost ? String(cost) : '');
-
-  useEffect(() => {
-    setValue(cost ? String(cost) : '');
-  }, [legId, cost]);
-
-  const commit = () => {
-    if (!canEdit) return;
-    const n = value === '' ? 0 : Number(value);
-    if (Number.isNaN(n) || n < 0) {
-      setValue(cost ? String(cost) : '');
-      return;
-    }
-    if (n !== cost) onChange(n);
-  };
-
-  return (
-    <div className="relative w-24 flex-shrink-0">
-      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-slate-500 pointer-events-none">
-        {currencySymbol(currency)}
-      </span>
-      <input
-        type="number"
-        min={0}
-        step="0.01"
-        className="input py-1 text-xs pl-5"
-        placeholder="0"
-        value={value}
-        disabled={!canEdit}
-        onChange={(e) => setValue(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-        }}
-      />
     </div>
   );
 }

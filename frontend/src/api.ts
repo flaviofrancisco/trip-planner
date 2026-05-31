@@ -188,6 +188,10 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(patch),
     }),
+  deleteIntraLeg: (tripId: string, cityId: string, legId: string) =>
+    request<Trip>(`/trips/${tripId}/cities/${cityId}/legs/${legId}`, {
+      method: 'DELETE',
+    }),
 
   // Inter-city legs
   setInterLeg: (
@@ -209,6 +213,10 @@ export const api = {
     request<Trip>(`/trips/${tripId}/legs/${legId}`, {
       method: 'PATCH',
       body: JSON.stringify(patch),
+    }),
+  deleteInterLeg: (tripId: string, legId: string) =>
+    request<Trip>(`/trips/${tripId}/legs/${legId}`, {
+      method: 'DELETE',
     }),
 
   // Expenses

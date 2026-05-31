@@ -7,6 +7,8 @@ import { TripMap, type MapMarker, type MapLeg } from '../components/TripMap';
 import { MapLegend } from '../components/MapLegend';
 import { AddPlaceForm } from '../components/AddPlaceForm';
 import { AttractionsList } from '../components/AttractionsList';
+import { RoutesList, type RouteStop } from '../components/RoutesList';
+import { TabbedPanel } from '../components/TabbedPanel';
 import { PoiPanel } from '../components/PoiPanel';
 import { ExpensesPanel } from '../components/ExpensesPanel';
 import { formatMoney } from '../utils/currency';
@@ -121,32 +123,43 @@ export function CityPlannerPage() {
     }
   };
 
-  const setIntraLeg = async (
+  const createIntraLeg = async (
     fromAttractionId: string,
     toAttractionId: string,
-    patch: { transportMode?: TransportMode; cost?: number },
-    existingLegId?: string
+    transportMode: TransportMode,
+    cost?: number
   ) => {
     try {
-      if (existingLegId) {
-        const updated = await api.updateIntraLeg(
-          trip.id,
-          city.id,
-          existingLegId,
-          patch
-        );
-        setTrip(updated);
-      } else if (patch.transportMode) {
-        const updated = await api.setIntraLeg(
-          trip.id,
-          city.id,
-          fromAttractionId,
-          toAttractionId,
-          patch.transportMode,
-          patch.cost
-        );
-        setTrip(updated);
-      }
+      const updated = await api.setIntraLeg(
+        trip.id,
+        city.id,
+        fromAttractionId,
+        toAttractionId,
+        transportMode,
+        cost
+      );
+      setTrip(updated);
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  };
+
+  const updateIntraLeg = async (
+    legId: string,
+    patch: { transportMode?: TransportMode; cost?: number }
+  ) => {
+    try {
+      const updated = await api.updateIntraLeg(trip.id, city.id, legId, patch);
+      setTrip(updated);
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  };
+
+  const deleteIntraLeg = async (legId: string) => {
+    try {
+      const updated = await api.deleteIntraLeg(trip.id, city.id, legId);
+      setTrip(updated);
     } catch (e: any) {
       toast.error(e.message);
     }
@@ -224,26 +237,63 @@ export function CityPlannerPage() {
               onAdd={(p) => addAttraction(p)}
             />
           )}
-          <AttractionsList
-            trip={trip}
-            city={city}
-            canEdit={canEdit}
-            selectedAttractionId={selectedAttractionId}
-            onSelectAttraction={setSelectedAttractionId}
-            onChangeLeg={setIntraLeg}
-            onReorder={async (order) => {
-              try {
-                const updated = await api.reorderAttractions(
-                  trip.id,
-                  city.id,
-                  order
-                );
-                setTrip(updated);
-                toast.success('Attractions reordered');
-              } catch (e: any) {
-                toast.error(e.message);
-              }
-            }}
+          <TabbedPanel
+            tabs={[
+              {
+                key: 'attractions',
+                label: 'Attractions',
+                badge: city.attractions.length,
+                content: (
+                  <AttractionsList
+                    trip={trip}
+                    city={city}
+                    canEdit={canEdit}
+                    selectedAttractionId={selectedAttractionId}
+                    onSelectAttraction={setSelectedAttractionId}
+                    onReorder={async (order) => {
+                      try {
+                        const updated = await api.reorderAttractions(
+                          trip.id,
+                          city.id,
+                          order
+                        );
+                        setTrip(updated);
+                        toast.success('Attractions reordered');
+                      } catch (e: any) {
+                        toast.error(e.message);
+                      }
+                    }}
+                  />
+                ),
+              },
+              {
+                key: 'routes',
+                label: 'Routes',
+                badge: city.legs.length,
+                content: (
+                  <RoutesList
+                    emptyHint="No routes yet. Add one to plan how you'll move between attractions."
+                    stops={city.attractions.map<RouteStop>((a) => ({
+                      id: a.id,
+                      number: a.attractionNumber,
+                      label: a.poiName,
+                    }))}
+                    routes={city.legs.map((l) => ({
+                      id: l.id,
+                      fromId: l.fromAttractionId,
+                      toId: l.toAttractionId,
+                      transportMode: l.transportMode,
+                      cost: l.cost,
+                    }))}
+                    canEdit={canEdit}
+                    currency={currency}
+                    onCreate={createIntraLeg}
+                    onUpdate={updateIntraLeg}
+                    onDelete={deleteIntraLeg}
+                  />
+                ),
+              },
+            ]}
           />
         </aside>
 
