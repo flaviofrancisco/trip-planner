@@ -1,0 +1,169 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  background-image: radial-gradient(
+      1200px 600px at 15% -10%,
+      rgba(59, 130, 246, 0.06),
+      transparent
+    ),
+    radial-gradient(800px 500px at 90% 110%, rgba(168, 85, 247, 0.06), transparent);
+  background-attachment: fixed;
+}
+
+.dark body {
+  background-image: radial-gradient(
+      1200px 600px at 15% -10%,
+      rgba(59, 130, 246, 0.18),
+      transparent
+    ),
+    radial-gradient(800px 500px at 90% 110%, rgba(168, 85, 247, 0.18), transparent);
+}
+
+.leaflet-container {
+  height: 100%;
+  width: 100%;
+  background: #e2e8f0;
+}
+.dark .leaflet-container {
+  background: #1e293b;
+}
+
+/* Numbered POI marker (attraction) */
+.poi-marker {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: white;
+  border-radius: 9999px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  border: 2px solid white;
+  box-shadow: 0 4px 10px -3px rgba(37, 99, 235, 0.45),
+    0 2px 4px rgba(0, 0, 0, 0.18);
+  font-size: 13px;
+  transition: transform 150ms ease;
+}
+.poi-marker:hover {
+  transform: scale(1.08);
+}
+
+/* City marker on overview map */
+.city-marker {
+  background: linear-gradient(135deg, #a855f7, #7c3aed);
+  color: white;
+  border-radius: 14px;
+  padding: 4px 10px 4px 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 700;
+  border: 2px solid white;
+  box-shadow: 0 6px 18px -6px rgba(124, 58, 237, 0.65),
+    0 2px 6px rgba(0, 0, 0, 0.18);
+  font-size: 12px;
+  white-space: nowrap;
+  transition: transform 150ms ease;
+}
+.city-marker:hover {
+  transform: scale(1.05);
+}
+.city-marker .num {
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 9999px;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+}
+
+/* Buttons */
+.btn {
+  @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-150;
+}
+.btn-primary {
+  @apply btn text-white shadow-sm;
+  background-image: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+.btn-primary:hover:not(:disabled) {
+  background-image: linear-gradient(135deg, #2563eb, #1d4ed8);
+  box-shadow: 0 4px 12px -4px rgba(37, 99, 235, 0.5);
+}
+.btn-primary:disabled {
+  @apply opacity-50 cursor-not-allowed;
+}
+.btn-secondary {
+  @apply btn bg-slate-100 hover:bg-slate-200 text-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-100;
+}
+.btn-danger {
+  @apply btn text-white shadow-sm;
+  background-image: linear-gradient(135deg, #ef4444, #dc2626);
+}
+.btn-danger:hover:not(:disabled) {
+  background-image: linear-gradient(135deg, #dc2626, #b91c1c);
+  box-shadow: 0 4px 12px -4px rgba(220, 38, 38, 0.55);
+}
+.btn-ghost {
+  @apply btn hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200;
+}
+
+.input {
+  @apply w-full px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-900 placeholder-slate-400 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100 dark:placeholder-slate-500;
+}
+.label {
+  @apply block text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400 mb-1;
+}
+.card {
+  @apply bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm transition-shadow;
+}
+.card-hover {
+  @apply card hover:shadow-md hover:border-slate-300 dark:hover:border-slate-600;
+}
+
+/* Pretty pill / badge */
+.pill {
+  @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200;
+}
+.pill-brand {
+  @apply pill bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300;
+}
+
+/* Toast slide-in */
+@keyframes toast-in {
+  from {
+    transform: translateX(16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+.toast-enter {
+  animation: toast-in 180ms ease-out;
+}
+
+/* Subtle scrollbars */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.35);
+  border-radius: 3px;
+}
+.dark .scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+}

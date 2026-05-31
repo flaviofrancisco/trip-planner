@@ -1,0 +1,69 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Environment & secrets — NEVER commit real values
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.staging
+.env.test
+!.env.example
+
+# Credentials / keys
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+secrets/
+credentials.json
+service-account*.json
+*.secret
+*_rsa
+*_dsa
+*_ecdsa
+*_ed25519
+.aws/
+.gcloud/
+
+# Logs & runtime
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+pids/
+*.pid
+*.seed
+
+# Coverage & test artifacts
+coverage/
+.nyc_output/
+
+# OS junk (macOS especially noisy on FAT/exFAT volumes)
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.history/
+
+# Local Docker / data volumes
+mongo-data/
+data/
+.claude/
