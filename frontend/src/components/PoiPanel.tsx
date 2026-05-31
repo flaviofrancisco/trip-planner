@@ -29,12 +29,20 @@ export function PoiPanel({
   const [costInput, setCostInput] = useState<string>(
     attraction.cost ? String(attraction.cost) : ''
   );
+  const [latInput, setLatInput] = useState<string>(
+    String(attraction.coordinates.lat)
+  );
+  const [lngInput, setLngInput] = useState<string>(
+    String(attraction.coordinates.lng)
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     setDraft(attraction);
     setCostInput(attraction.cost ? String(attraction.cost) : '');
+    setLatInput(String(attraction.coordinates.lat));
+    setLngInput(String(attraction.coordinates.lng));
   }, [attraction.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = async (patch: Partial<Attraction>) => {
@@ -58,6 +66,28 @@ export function PoiPanel({
     if (Object.keys(patch).length) save(patch);
   };
 
+  const onBlurCoords = () => {
+    if (!canEdit) return;
+    const lat = Number(latInput);
+    const lng = Number(lngInput);
+    const latValid = Number.isFinite(lat) && lat >= -90 && lat <= 90;
+    const lngValid = Number.isFinite(lng) && lng >= -180 && lng <= 180;
+    if (!latValid || !lngValid) {
+      setError('Latitude must be -90..90 and longitude must be -180..180');
+      setLatInput(String(attraction.coordinates.lat));
+      setLngInput(String(attraction.coordinates.lng));
+      return;
+    }
+    if (
+      lat === attraction.coordinates.lat &&
+      lng === attraction.coordinates.lng
+    ) {
+      return;
+    }
+    setDraft({ ...draft, coordinates: { lat, lng } });
+    save({ coordinates: { lat, lng } });
+  };
+
   return (
     <div className="card p-4 space-y-3">
       <div className="flex items-start justify-between gap-2">
@@ -78,9 +108,34 @@ export function PoiPanel({
         </button>
       </div>
 
-      <div className="text-xs text-slate-500">
-        {attraction.coordinates.lat.toFixed(4)},{' '}
-        {attraction.coordinates.lng.toFixed(4)}
+      <div>
+        <label className="label">Coordinates</label>
+        <div className="grid grid-cols-2 gap-2">
+          <input
+            className="input"
+            type="number"
+            step="0.0001"
+            min={-90}
+            max={90}
+            placeholder="Latitude"
+            value={latInput}
+            onChange={(e) => setLatInput(e.target.value)}
+            onBlur={onBlurCoords}
+            disabled={!canEdit}
+          />
+          <input
+            className="input"
+            type="number"
+            step="0.0001"
+            min={-180}
+            max={180}
+            placeholder="Longitude"
+            value={lngInput}
+            onChange={(e) => setLngInput(e.target.value)}
+            onBlur={onBlurCoords}
+            disabled={!canEdit}
+          />
+        </div>
       </div>
 
       <div>
