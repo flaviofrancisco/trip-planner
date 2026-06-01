@@ -23,10 +23,10 @@ Built end-to-end against the PRD in [`trip-planner.md`](./trip-planner.md).
 
 | Layer | Tech |
 |---|---|
-| **Frontend** | React 18 · TypeScript · Vite · Tailwind CSS · React-Leaflet · `@dnd-kit` · `lucide-react` · `xlsx` |
+| **Frontend** | React 18 · TypeScript · Vite · Tailwind CSS · Google Maps JS API · `@dnd-kit` · `lucide-react` · `xlsx` |
 | **Backend** | Node.js · Express · TypeScript · Mongoose · JWT (bcrypt + zod) · OpenAI SDK · Google Generative AI SDK |
 | **Database** | MongoDB 7 |
-| **Geocoding** | OpenStreetMap Nominatim |
+| **Maps & Geocoding** | Google Maps JavaScript API · Google Places Autocomplete · Google Geocoding API · Google Routes API v2 |
 | **Runtime** | Docker + Docker Compose |
 
 ---
@@ -39,8 +39,9 @@ Built end-to-end against the PRD in [`trip-planner.md`](./trip-planner.md).
 # 1. Create your local env file from the template
 cp .env.example .env
 
-# 2. Edit .env and replace JWT_SECRET with a long random string
-#    (e.g. `openssl rand -hex 48`)
+# 2. Edit .env and fill in:
+#    - JWT_SECRET with a long random string (e.g. `openssl rand -hex 48`)
+#    - GOOGLE_MAPS_API_KEY and VITE_GOOGLE_MAPS_API_KEY with your Google Maps API key
 
 # 3. Build and start everything
 make rebuild
@@ -50,11 +51,22 @@ Then open:
 
 | Service | URL |
 |---|---|
-| Frontend | http://localhost:5173 |
+| Frontend | http://localhost:3000 |
 | Backend health | http://localhost:4000/api/health |
 | MongoDB | `mongodb://localhost:27017/tripplanner` |
 
-After signing up, click the **Settings** ⚙️ button in the header to add your OpenAI and/or Gemini API keys (stored per-user in the DB). At least one is required for the AI agent and voice translator.
+### Google Maps API setup
+
+A Google Maps API key is required for maps, geocoding, autocomplete, and directions. In the [Google Cloud Console](https://console.cloud.google.com/apis/library), enable these APIs for your key:
+
+- **Maps JavaScript API** — interactive map rendering
+- **Places API** — autocomplete search
+- **Geocoding API** — address lookup and reverse geocoding
+- **Routes API** — real route directions with duration, distance, fare, and polylines
+
+Set the same key in `.env` as both `GOOGLE_MAPS_API_KEY` (backend) and `VITE_GOOGLE_MAPS_API_KEY` (frontend).
+
+After signing up, click the **Settings** button in the header to add your OpenAI and/or Gemini API keys (stored per-user in the DB). At least one is required for the AI agent and voice translator.
 
 Source under `frontend/src` and `backend/src` is bind-mounted into the containers, so edits hot-reload.
 
@@ -88,8 +100,8 @@ Rotate it immediately (regenerate `JWT_SECRET`, revoke API keys), then purge it 
 
 - Generate `JWT_SECRET` with a CSPRNG (`openssl rand -hex 48`); never use the example default.
 - Encrypt the user `apiKeys` field at rest (KMS-wrapped envelope encryption).
-- Swap Nominatim for Mapbox / Google for any non-trivial geocoding volume — Nominatim's usage policy will throttle you.
-- Set `CORS_ORIGIN` to your real frontend origin, not `http://localhost:5173`.
+- Restrict your Google Maps API key to specific referrers/IPs and only the APIs you need.
+- Set `CORS_ORIGIN` to your real frontend origin, not `http://localhost:3000`.
 
 ---
 
@@ -122,12 +134,16 @@ Rotate it immediately (regenerate `JWT_SECRET`, revoke API keys), then purge it 
 - Multiple trips, dropdown loader, per-trip live **Total Estimated Cost**.
 - **Export to Excel (.xlsx)** — one click in the trip header; produces Stops, Transport, and Summary sheets (notes, costs, reservations, coordinates, ratings).
 
-### Map & POIs
-- Add a POI by city/place search or by exact lat/lng.
-- Per-stop: name, attraction icon, notes, cost or free toggle, reservation icon (Hotel / Airbnb / Museum / Restaurant / Guided / Boat), 5-star rating.
+### Map & POIs (Google Maps)
+- Interactive **Google Maps** with `AdvancedMarkerElement` for city and attraction markers.
+- **Google Places Autocomplete** on the search box — type a name, pick from suggestions, instantly adds the place with address and coordinates.
+- Add a POI by autocomplete search, manual geocode search, exact lat/lng coordinates, GPS "Use my location", or **double-clicking** anywhere on the map.
+- **Address metadata** — saved automatically from autocomplete, search, or reverse geocoding; editable in the detail panel.
+- **Coordinates display** — formatted as `45.4642°N, 9.1900°E` in the POI detail panel.
+- Per-stop: name, address, attraction icon (museum, restaurant, park, landmark, beach, mountain, shopping, nightlife, theater, church, zoo, viewpoint, **hotel**, **airbnb**), notes, cost or free toggle, reservation icon (Hotel / Airbnb / Museum / Restaurant / Guided / Boat), 5-star rating.
 
 ### Itinerary & transport
-Auto-numbered stops; transport legs visualized with the PRD's color/style mapping:
+Auto-numbered stops; transport legs visualized with color/style mapping:
 
 | Mode | Color | Style |
 |---|---|---|
@@ -139,8 +155,17 @@ Auto-numbered stops; transport legs visualized with the PRD's color/style mappin
 | ⛴️ Ferry | Grey | Solid |
 | 🚌 Bus | Orange | Solid |
 | 🚗 Rented Car | Black | Solid |
+| 🚏 Public Transport | Cyan | Solid |
 
 A legend is rendered on the map.
+
+### Google Directions integration
+- Click the navigation button on any route to fetch **real directions** from the Google Routes API v2.
+- **Multiple route alternatives** displayed in a picker modal with summary, duration, distance, and transit fare (when available).
+- Select a route to save its **duration**, **distance**, **cost** (from fare), and **encoded polyline**.
+- The map renders the **actual route path** (curved road/rail line) instead of a straight line between markers.
+- Directions work for walking, driving, and transit modes; plane mode gracefully shows "not available".
+- Route info persists across sessions — the polyline and metadata are stored on the leg.
 
 ### AI travel agent
 Chat panel embedded in the trip page (right sidebar). Pick the provider per-request: **OpenAI `gpt-4o-mini`** or **Gemini `gemini-1.5-flash`**.
@@ -183,26 +208,30 @@ trip-planner/
 ├── Makefile
 ├── .env.example
 ├── .gitignore
-├── trip-planner.md             # PRD
+├── trip-planner.md                 # PRD
 ├── backend/
 │   ├── Dockerfile · package.json · tsconfig.json
 │   └── src/
 │       ├── server.ts
-│       ├── middleware/         # auth + errorHandler
-│       ├── models/             # User (apiKeys, prefs), Trip (embedded steps & legs)
-│       ├── routes/             # auth, users, trips, ai
-│       └── services/           # ai, tripTools, optimizer, geocode
+│       ├── middleware/             # auth + errorHandler
+│       ├── models/                 # User (apiKeys, prefs), Trip (cities, legs, expenses)
+│       ├── routes/                 # auth, users, trips, ai, directions
+│       └── services/              # ai, tripTools, optimizer, geocode
 └── frontend/
     ├── Dockerfile · package.json · tailwind.config.js · vite.config.ts
-    ├── index.html
+    ├── index.html                  # Loads Google Maps JS API
     └── src/
         ├── main.tsx · App.tsx · api.ts · types.ts · constants.ts · styles.css
-        ├── utils/              # export.ts → xlsx
-        ├── context/            # AuthContext, ThemeContext
-        ├── components/         # Layout, ThemeSync, SettingsModal, TripMap, MapLegend,
-        │                       # AddPoiForm, PoiPanel, StepsList, SharePanel,
-        │                       # AIChatPanel, VoiceTranslator
-        └── pages/              # LoginPage, SignupPage, TripsPage, TripPlannerPage
+        ├── utils/                  # export.ts, currency.ts, date.ts, aiErrors.ts
+        ├── context/                # AuthContext, ThemeContext, ToastContext, ConfirmContext
+        ├── components/             # Layout, ThemeSync, SettingsModal, TripMap (Google Maps),
+        │                           # MapLegend, AddPlaceForm (Places Autocomplete),
+        │                           # DirectionsPicker, PoiPanel, AttractionsList,
+        │                           # CitiesList, CityDetailPanel, RoutesList,
+        │                           # TabbedPanel, ExpensesPanel, SharePanel,
+        │                           # AIChatPanel, VoiceTranslator
+        └── pages/                  # LoginPage, SignupPage, TripsPage,
+                                    # TripPlannerPage, CityPlannerPage
 ```
 
 ---
@@ -219,18 +248,32 @@ All routes except `/api/auth/*` require `Authorization: Bearer <jwt>`.
 | PATCH | `/api/users/me` | Update name, `preferences.theme`, `apiKeys.{openai,gemini}` |
 | GET | `/api/trips` | List my + shared trips |
 | POST | `/api/trips` | Create trip |
-| GET | `/api/trips/:id` | Trip with steps, legs, sharing, totalCost |
-| PATCH | `/api/trips/:id` | Rename trip |
+| GET | `/api/trips/:id` | Trip with cities, legs, sharing, totalCost |
+| PATCH | `/api/trips/:id` | Rename trip, set currency |
 | DELETE | `/api/trips/:id` | Delete trip (owner only) |
-| POST | `/api/trips/:id/steps` | Add stop |
-| PATCH | `/api/trips/:id/steps/:stepId` | Update stop |
-| DELETE | `/api/trips/:id/steps/:stepId` | Delete stop |
-| POST | `/api/trips/:id/steps/reorder` | `{ order: [stepId,…] }` |
-| POST | `/api/trips/:id/legs` | `{ fromStepId, toStepId, transportMode }` |
-| PATCH | `/api/trips/:id/legs/:legId` | `{ transportMode }` |
-| DELETE | `/api/trips/:id/legs/:legId` | Delete leg |
+| POST | `/api/trips/:id/cities` | Add city |
+| PATCH | `/api/trips/:id/cities/:cityId` | Update city |
+| DELETE | `/api/trips/:id/cities/:cityId` | Delete city |
+| POST | `/api/trips/:id/cities/reorder` | `{ order: [cityId,…] }` |
+| POST | `/api/trips/:id/cities/:cityId/attractions` | Add attraction |
+| PATCH | `/api/trips/:id/cities/:cityId/attractions/:id` | Update attraction (name, address, coords, notes, cost, rating, icons, visitAt) |
+| DELETE | `/api/trips/:id/cities/:cityId/attractions/:id` | Delete attraction |
+| POST | `/api/trips/:id/cities/:cityId/attractions/reorder` | `{ order: [attractionId,…] }` |
+| POST | `/api/trips/:id/legs` | Inter-city leg `{ fromCityId, toCityId, transportMode }` |
+| PATCH | `/api/trips/:id/legs/:legId` | Update leg (mode, cost, duration, distance, routePolyline) |
+| DELETE | `/api/trips/:id/legs/:legId` | Delete inter-city leg |
+| POST | `/api/trips/:id/cities/:cityId/legs` | Intra-city leg between attractions |
+| PATCH | `/api/trips/:id/cities/:cityId/legs/:legId` | Update intra-city leg |
+| DELETE | `/api/trips/:id/cities/:cityId/legs/:legId` | Delete intra-city leg |
+| POST | `/api/trips/:id/expenses` | Add trip-level expense |
+| PATCH | `/api/trips/:id/expenses/:expenseId` | Update trip-level expense |
+| DELETE | `/api/trips/:id/expenses/:expenseId` | Delete trip-level expense |
+| POST | `/api/trips/:id/cities/:cityId/expenses` | Add city-level expense |
+| PATCH | `/api/trips/:id/cities/:cityId/expenses/:expenseId` | Update city-level expense |
+| DELETE | `/api/trips/:id/cities/:cityId/expenses/:expenseId` | Delete city-level expense |
 | POST | `/api/trips/:id/share` | `{ email, permission }` (owner only) |
 | DELETE | `/api/trips/:id/share/:userId` | Unshare (owner only) |
+| GET | `/api/directions` | Proxy to Google Routes API v2 (origin, destination, transportMode) |
 | POST | `/api/ai/chat` | `{ tripId, provider, messages }` → `{ reply, toolCalls, trip }` |
 | POST | `/api/ai/translate` | `{ provider, text, sourceLang, targetLang }` → `{ translated }` |
 | POST | `/api/ai/optimize/:tripId` | Reorders stops via nearest-neighbor heuristic |
@@ -241,9 +284,11 @@ All routes except `/api/auth/*` require `Authorization: Bearer <jwt>`.
 
 - `JWT_SECRET` defaults to `change-me-in-prod` in `docker-compose.yml` — set it via `.env` for anything beyond local hacking.
 - API keys live on the user document in MongoDB; the schema strips them from responses but **does not encrypt at rest**. Wrap them with KMS for production.
-- Nominatim has a usage policy. Swap to Mapbox / Google for production volume.
+- **Google Maps API key** is required. Enable Maps JavaScript API, Places API, Geocoding API, and Routes API in your Google Cloud project. The same key is used by both frontend and backend.
 - Voice recognition relies on the Web Speech API and works best in Chrome / Edge. Translation and TTS work in all modern browsers.
 - AI tool calling can chain many edits per turn (up to 6 rounds). The chat panel only appears for users with editor or owner permission on the trip.
+- Directions for **plane** mode are not available (Google Routes API does not support flight routing); the map falls back to a straight line.
+- Transit **fare** information depends on the transit agency providing data to Google; it may not be available in all regions.
 
 ---
 

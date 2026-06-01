@@ -130,6 +130,7 @@ export const api = {
     cityId: string,
     data: {
       poiName: string;
+      address?: string;
       coordinates: { lat: number; lng: number };
       notes?: string;
       cost?: number;
@@ -182,7 +183,7 @@ export const api = {
     tripId: string,
     cityId: string,
     legId: string,
-    patch: { transportMode?: TransportMode; cost?: number }
+    patch: { transportMode?: TransportMode; cost?: number; duration?: string | null; distance?: string | null; routePolyline?: string | null }
   ) =>
     request<Trip>(`/trips/${tripId}/cities/${cityId}/legs/${legId}`, {
       method: 'PATCH',
@@ -208,7 +209,7 @@ export const api = {
   updateInterLeg: (
     tripId: string,
     legId: string,
-    patch: { transportMode?: TransportMode; cost?: number }
+    patch: { transportMode?: TransportMode; cost?: number; duration?: string | null; distance?: string | null; routePolyline?: string | null }
   ) =>
     request<Trip>(`/trips/${tripId}/legs/${legId}`, {
       method: 'PATCH',
@@ -300,31 +301,41 @@ export const api = {
   unshareTrip: (tripId: string, userId: string) =>
     request<Trip>(`/trips/${tripId}/share/${userId}`, { method: 'DELETE' }),
 
-  // Geocoding
+  // Geocoding (Google Geocoding API)
   geocode: async (query: string) => {
+    const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(
+      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
         query
-      )}`,
-      { headers: { Accept: 'application/json' } }
+      )}&key=${key}`
     );
     if (!res.ok) throw new Error('Geocoding failed');
-    const data: Array<{ lat: string; lon: string; display_name: string }> =
-      await res.json();
-    return data.map((r) => ({
-      lat: Number(r.lat),
-      lng: Number(r.lon),
-      label: r.display_name,
+    const data = (await res.json()) as {
+      status: string;
+      results: Array<{
+        geometry: { location: { lat: number; lng: number } };
+        formatted_address: string;
+      }>;
+    };
+    if (data.status !== 'OK' || data.results.length === 0) return [];
+    return data.results.slice(0, 5).map((r) => ({
+      lat: r.geometry.location.lat,
+      lng: r.geometry.location.lng,
+      label: r.formatted_address,
     }));
   },
   reverseGeocode: async (lat: number, lng: number) => {
+    const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
-      { headers: { Accept: 'application/json' } }
+      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${key}`
     );
     if (!res.ok) return null;
-    const data = (await res.json()) as { display_name?: string } | null;
-    return data?.display_name || null;
+    const data = (await res.json()) as {
+      status: string;
+      results: Array<{ formatted_address: string }>;
+    };
+    if (data.status !== 'OK' || data.results.length === 0) return null;
+    return data.results[0].formatted_address;
   },
 
   // AI
@@ -355,4 +366,38 @@ export const api = {
     }),
   aiOptimize: (tripId: string) =>
     request<Trip>(`/ai/optimize/${tripId}`, { method: 'POST' }),
+
+  // Directions
+  getDirections: (
+    origin: { lat: number; lng: number },
+    destination: { lat: number; lng: number },
+    transportMode: string
+  ) =>
+    request<{
+      routes: Array<{
+        summary: string;
+        duration: string;
+        durationValue: number;
+        distance: string;
+        distanceValue: number;
+        fare?: { amount: number; currency: string; text: string };
+        polyline: string;
+        transitSteps?: Array<{
+          vehicleType: string;
+          vehicleEmoji: string;
+          vehicleLabel: string;
+          lineName: string;
+          lineColor: string | null;
+          lineTextColor: string | null;
+          agencyName: string;
+          stopCount: number | null;
+          departureStop: string;
+          arrivalStop: string;
+          duration: string | null;
+        }>;
+      }>;
+      message?: string;
+    }>(
+      `/directions?origin=${origin.lat},${origin.lng}&destination=${destination.lat},${destination.lng}&transportMode=${transportMode}`
+    ),
 };

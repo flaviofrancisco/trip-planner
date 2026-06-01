@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Search, Crosshair, Plus, LocateFixed } from 'lucide-react';
 import { api } from '../api';
 
 export type PlaceData = {
   name: string;
+  address?: string;
   coordinates: { lat: number; lng: number };
 };
 
@@ -33,6 +34,93 @@ export function AddPlaceForm({
   const [coordName, setCoordName] = useState('');
   const [error, setError] = useState('');
   const [locating, setLocating] = useState(false);
+  const autocompleteContainerRef = useRef<HTMLDivElement>(null);
+  const autocompleteInitRef = useRef(false);
+  const onAddRef = useRef(onAdd);
+  onAddRef.current = onAdd;
+
+  // Set up Google Places Autocomplete — tries new PlaceAutocompleteElement first,
+  // falls back to legacy Autocomplete if not available
+  useEffect(() => {
+    if (mode !== 'search') return;
+    const container = autocompleteContainerRef.current;
+    if (!container || autocompleteInitRef.current) return;
+    if (typeof google === 'undefined' || !google.maps?.places) return;
+
+    autocompleteInitRef.current = true;
+
+    // Try the new PlaceAutocompleteElement API
+    const PlaceAC = (google.maps.places as any).PlaceAutocompleteElement;
+    if (PlaceAC) {
+      setupNewAutocomplete(container, PlaceAC);
+    } else {
+      // Fallback: try importing the library dynamically
+      google.maps.importLibrary('places').then((lib: any) => {
+        if (lib.PlaceAutocompleteElement) {
+          setupNewAutocomplete(container, lib.PlaceAutocompleteElement);
+        } else {
+          setupLegacyAutocomplete(container);
+        }
+      }).catch(() => {
+        setupLegacyAutocomplete(container);
+      });
+    }
+
+    function setupNewAutocomplete(el: HTMLDivElement, PlaceAutocompleteElement: any) {
+      const acElement = new PlaceAutocompleteElement();
+      el.innerHTML = '';
+      el.appendChild(acElement);
+
+      acElement.addEventListener('gmp-placeselect', async (evt: any) => {
+        const place = evt.place;
+        if (!place) return;
+
+        try {
+          await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location'] });
+        } catch {
+          return;
+        }
+
+        const location = place.location;
+        if (!location) return;
+
+        const lat = location.lat();
+        const lng = location.lng();
+        const name = place.displayName || place.formattedAddress?.split(',')[0] || 'Unnamed';
+        const address = place.formattedAddress || '';
+
+        onAddRef.current({ name, address, coordinates: { lat, lng } }).catch(() => {});
+      });
+    }
+
+    function setupLegacyAutocomplete(el: HTMLDivElement) {
+      // Create an input element for the legacy Autocomplete
+      const input = document.createElement('input');
+      input.className = 'input';
+      input.placeholder = searchPlaceholder;
+      el.innerHTML = '';
+      el.appendChild(input);
+
+      const ac = new google.maps.places.Autocomplete(input, {
+        fields: ['geometry', 'name', 'formatted_address'],
+      });
+
+      ac.addListener('place_changed', () => {
+        const place = ac.getPlace();
+        if (!place.geometry?.location) return;
+        const lat = place.geometry.location.lat();
+        const lng = place.geometry.location.lng();
+        const name = place.name || place.formatted_address?.split(',')[0] || 'Unnamed';
+        const address = place.formatted_address || '';
+        onAddRef.current({ name, address, coordinates: { lat, lng } }).catch(() => {});
+        input.value = '';
+      });
+    }
+
+    return () => {
+      autocompleteInitRef.current = false;
+    };
+  }, [mode, searchPlaceholder]);
 
   const useMyLocation = async () => {
     setError('');
@@ -52,11 +140,15 @@ export function AddPlaceForm({
       const la = pos.coords.latitude;
       const ln = pos.coords.longitude;
       let name = 'My location';
+      let address = '';
       try {
         const label = await api.reverseGeocode(la, ln);
-        if (label) name = label.split(',')[0].trim() || name;
+        if (label) {
+          name = label.split(',')[0].trim() || name;
+          address = label;
+        }
       } catch {}
-      await onAdd({ name, coordinates: { lat: la, lng: ln } });
+      await onAdd({ name, address, coordinates: { lat: la, lng: ln } });
     } catch (err: any) {
       const code = err?.code;
       if (code === 1) setError('Location permission denied');
@@ -87,7 +179,7 @@ export function AddPlaceForm({
   const addResult = async (r: { lat: number; lng: number; label: string }) => {
     const name = r.label.split(',')[0].trim() || 'Unnamed';
     try {
-      await onAdd({ name, coordinates: { lat: r.lat, lng: r.lng } });
+      await onAdd({ name, address: r.label, coordinates: { lat: r.lat, lng: r.lng } });
       setResults([]);
       setQuery('');
     } catch (e: any) {
@@ -164,6 +256,9 @@ export function AddPlaceForm({
 
       {mode === 'search' ? (
         <>
+          {/* Google Places Autocomplete */}
+          <div ref={autocompleteContainerRef} className="place-autocomplete-wrapper mb-2" />
+          {/* Manual geocode search as fallback */}
           <form onSubmit={doSearch} className="flex gap-1">
             <input
               className="input"

@@ -28,12 +28,12 @@ body {
     radial-gradient(800px 500px at 90% 110%, rgba(168, 85, 247, 0.18), transparent);
 }
 
-.leaflet-container {
+.gmap-container {
   height: 100%;
   width: 100%;
   background: #e2e8f0;
 }
-.dark .leaflet-container {
+.dark .gmap-container {
   background: #1e293b;
 }
 
@@ -153,6 +153,36 @@ body {
 }
 .toast-enter {
   animation: toast-in 180ms ease-out;
+}
+
+/* Google Places Autocomplete Element */
+.place-autocomplete-wrapper gmp-place-autocomplete {
+  width: 100%;
+  font-family: inherit;
+}
+.place-autocomplete-wrapper gmp-place-autocomplete::part(input) {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid #cbd5e1;
+  background: white;
+  color: #0f172a;
+  font-size: 0.875rem;
+  transition: border-color 150ms, box-shadow 150ms;
+  outline: none;
+}
+.place-autocomplete-wrapper gmp-place-autocomplete::part(input):focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+.dark .place-autocomplete-wrapper gmp-place-autocomplete::part(input) {
+  background: #1e293b;
+  border-color: #475569;
+  color: #f1f5f9;
+}
+.dark .place-autocomplete-wrapper gmp-place-autocomplete::part(input):focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
 }
 
 /* Subtle scrollbars */

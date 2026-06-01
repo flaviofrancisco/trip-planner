@@ -26,7 +26,8 @@ services:
       MONGO_URI: mongodb://mongo:27017/tripplanner
       JWT_SECRET: ${JWT_SECRET:-change-me-in-prod}
       JWT_EXPIRES_IN: 7d
-      CORS_ORIGIN: http://localhost:5173
+      CORS_ORIGIN: http://localhost:3000
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
     volumes:
       - ./backend/src:/app/src
       - ./backend/package.json:/app/package.json
@@ -41,12 +42,14 @@ services:
     depends_on:
       - backend
     ports:
-      - "5173:5173"
+      - "3000:5173"
     environment:
       VITE_API_URL: http://localhost:4000/api
+      VITE_GOOGLE_MAPS_API_KEY: ${VITE_GOOGLE_MAPS_API_KEY:-}
     volumes:
       - ./frontend/src:/app/src
       - ./frontend/index.html:/app/index.html
+      - ./frontend/.env:/app/.env
       - ./frontend/vite.config.ts:/app/vite.config.ts
       - ./frontend/tailwind.config.js:/app/tailwind.config.js
       - ./frontend/postcss.config.js:/app/postcss.config.js

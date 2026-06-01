@@ -78,11 +78,13 @@ export function CityPlannerPage() {
 
   const addAttraction = async (place: {
     name: string;
+    address?: string;
     coordinates: { lat: number; lng: number };
   }) => {
     try {
       const updated = await api.addAttraction(trip.id, city.id, {
         poiName: place.name,
+        address: place.address,
         coordinates: place.coordinates,
       });
       setTrip(updated);
@@ -146,7 +148,7 @@ export function CityPlannerPage() {
 
   const updateIntraLeg = async (
     legId: string,
-    patch: { transportMode?: TransportMode; cost?: number }
+    patch: { transportMode?: TransportMode; cost?: number; duration?: string | null; distance?: string | null; routePolyline?: string | null }
   ) => {
     try {
       const updated = await api.updateIntraLeg(trip.id, city.id, legId, patch);
@@ -180,6 +182,7 @@ export function CityPlannerPage() {
     fromId: l.fromAttractionId,
     toId: l.toAttractionId,
     transportMode: l.transportMode,
+    routePolyline: l.routePolyline,
   }));
 
   return (
@@ -277,6 +280,8 @@ export function CityPlannerPage() {
                       id: a.id,
                       number: a.attractionNumber,
                       label: a.poiName,
+                      lat: a.coordinates.lat,
+                      lng: a.coordinates.lng,
                     }))}
                     routes={city.legs.map((l) => ({
                       id: l.id,
@@ -284,6 +289,9 @@ export function CityPlannerPage() {
                       toId: l.toAttractionId,
                       transportMode: l.transportMode,
                       cost: l.cost,
+                      duration: l.duration,
+                      distance: l.distance,
+                      routePolyline: l.routePolyline,
                     }))}
                     canEdit={canEdit}
                     currency={currency}
@@ -303,6 +311,7 @@ export function CityPlannerPage() {
             legs={legs}
             selectedMarkerId={selectedAttractionId}
             onSelectMarker={setSelectedAttractionId}
+            onMapDoubleClick={canEdit ? addAttraction : undefined}
             defaultCenter={[city.coordinates.lat, city.coordinates.lng]}
             defaultZoom={12}
           />

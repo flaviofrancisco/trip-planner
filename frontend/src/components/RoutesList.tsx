@@ -1,13 +1,19 @@
 import { useEffect, useState } from 'react';
-import { ArrowRight, Plus, Trash2, X } from 'lucide-react';
+import { ArrowRight, Plus, Trash2, X, Navigation } from 'lucide-react';
 import type { TransportMode } from '../types';
 import { TRANSPORT_STYLES } from '../constants';
 import { currencySymbol } from '../utils/currency';
+import {
+  DirectionsPicker,
+  type DirectionSelection,
+} from './DirectionsPicker';
 
 export interface RouteStop {
   id: string;
   number: number;
   label: string;
+  lat: number;
+  lng: number;
 }
 
 export interface RouteEntry {
@@ -16,6 +22,9 @@ export interface RouteEntry {
   toId: string;
   transportMode: TransportMode;
   cost: number;
+  duration?: string;
+  distance?: string;
+  routePolyline?: string;
 }
 
 export function RoutesList({
@@ -41,7 +50,13 @@ export function RoutesList({
   ) => Promise<void>;
   onUpdate: (
     legId: string,
-    patch: { transportMode?: TransportMode; cost?: number }
+    patch: {
+      transportMode?: TransportMode;
+      cost?: number;
+      duration?: string | null;
+      distance?: string | null;
+      routePolyline?: string | null;
+    }
   ) => Promise<void>;
   onDelete: (legId: string) => Promise<void>;
 }) {
@@ -106,6 +121,14 @@ export function RoutesList({
             onChangeMode={(mode) => onUpdate(route.id, { transportMode: mode })}
             onChangeCost={(cost) => onUpdate(route.id, { cost })}
             onDelete={() => onDelete(route.id)}
+            onDirectionSelect={(sel) =>
+              onUpdate(route.id, {
+                duration: sel.duration,
+                distance: sel.distance,
+                routePolyline: sel.routePolyline,
+                ...(sel.cost !== undefined ? { cost: sel.cost } : {}),
+              })
+            }
           />
         ))}
 
@@ -187,6 +210,7 @@ function RouteRow({
   onChangeMode,
   onChangeCost,
   onDelete,
+  onDirectionSelect,
 }: {
   route: RouteEntry;
   stops: RouteStop[];
@@ -197,10 +221,12 @@ function RouteRow({
   onChangeMode: (mode: TransportMode) => Promise<void>;
   onChangeCost: (cost: number) => Promise<void>;
   onDelete: () => Promise<void>;
+  onDirectionSelect: (sel: DirectionSelection) => Promise<void>;
 }) {
   const [costText, setCostText] = useState<string>(
     route.cost ? String(route.cost) : ''
   );
+  const [showDirections, setShowDirections] = useState(false);
 
   useEffect(() => {
     setCostText(route.cost ? String(route.cost) : '');
@@ -218,78 +244,114 @@ function RouteRow({
 
   const stopOption = (s: RouteStop) => `#${s.number} ${s.label}`;
 
+  const fromStop = stops.find((s) => s.id === route.fromId);
+  const toStop = stops.find((s) => s.id === route.toId);
+
   return (
-    <div className="space-y-1.5 border border-slate-200 dark:border-slate-700 rounded-md p-2">
-      <div className="flex items-center gap-1.5 flex-wrap">
-        <select
-          className="input py-1 text-xs flex-1 min-w-0"
-          value={route.fromId}
-          disabled={!canEdit}
-          onChange={(e) => onChangeFrom(e.target.value)}
-        >
-          {stops.map((s) => (
-            <option key={s.id} value={s.id} disabled={s.id === route.toId}>
-              {stopOption(s)}
-            </option>
-          ))}
-        </select>
-        <ArrowRight className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-        <select
-          className="input py-1 text-xs flex-1 min-w-0"
-          value={route.toId}
-          disabled={!canEdit}
-          onChange={(e) => onChangeTo(e.target.value)}
-        >
-          {stops.map((s) => (
-            <option key={s.id} value={s.id} disabled={s.id === route.fromId}>
-              {stopOption(s)}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="flex items-center gap-1.5 flex-wrap">
-        <select
-          className="input py-1 text-xs flex-1 min-w-0"
-          value={route.transportMode}
-          disabled={!canEdit}
-          onChange={(e) => onChangeMode(e.target.value as TransportMode)}
-        >
-          {Object.entries(TRANSPORT_STYLES).map(([key, s]) => (
-            <option key={key} value={key}>
-              {s.emoji} {s.label}
-            </option>
-          ))}
-        </select>
-        <div className="relative w-24 flex-shrink-0">
-          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-slate-500 pointer-events-none">
-            {currencySymbol(currency)}
-          </span>
-          <input
-            type="number"
-            min={0}
-            step="0.01"
-            className="input py-1 text-xs pl-5"
-            placeholder="0"
-            value={costText}
+    <>
+      <div className="space-y-1.5 border border-slate-200 dark:border-slate-700 rounded-md p-2">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <select
+            className="input py-1 text-xs flex-1 min-w-0"
+            value={route.fromId}
             disabled={!canEdit}
-            onChange={(e) => setCostText(e.target.value)}
-            onBlur={commitCost}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-            }}
-          />
-        </div>
-        {canEdit && (
-          <button
-            type="button"
-            className="btn-ghost text-red-500 hover:text-red-700 p-1"
-            onClick={() => onDelete()}
-            title="Delete route"
+            onChange={(e) => onChangeFrom(e.target.value)}
           >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
+            {stops.map((s) => (
+              <option key={s.id} value={s.id} disabled={s.id === route.toId}>
+                {stopOption(s)}
+              </option>
+            ))}
+          </select>
+          <ArrowRight className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+          <select
+            className="input py-1 text-xs flex-1 min-w-0"
+            value={route.toId}
+            disabled={!canEdit}
+            onChange={(e) => onChangeTo(e.target.value)}
+          >
+            {stops.map((s) => (
+              <option key={s.id} value={s.id} disabled={s.id === route.fromId}>
+                {stopOption(s)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <select
+            className="input py-1 text-xs flex-1 min-w-0"
+            value={route.transportMode}
+            disabled={!canEdit}
+            onChange={(e) => onChangeMode(e.target.value as TransportMode)}
+          >
+            {Object.entries(TRANSPORT_STYLES).map(([key, s]) => (
+              <option key={key} value={key}>
+                {s.emoji} {s.label}
+              </option>
+            ))}
+          </select>
+          <div className="relative w-24 flex-shrink-0">
+            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-slate-500 pointer-events-none">
+              {currencySymbol(currency)}
+            </span>
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              className="input py-1 text-xs pl-5"
+              placeholder="0"
+              value={costText}
+              disabled={!canEdit}
+              onChange={(e) => setCostText(e.target.value)}
+              onBlur={commitCost}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+              }}
+            />
+          </div>
+          {canEdit && route.transportMode !== 'plane' && fromStop && toStop && (
+            <button
+              type="button"
+              className="btn-ghost text-brand-600 p-1"
+              onClick={() => setShowDirections(true)}
+              title="Get directions"
+            >
+              <Navigation className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {canEdit && (
+            <button
+              type="button"
+              className="btn-ghost text-red-500 hover:text-red-700 p-1"
+              onClick={() => onDelete()}
+              title="Delete route"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+        {(route.duration || route.distance) && (
+          <div className="flex gap-3 text-[11px] text-slate-500 dark:text-slate-400 pl-1">
+            {route.duration && <span>⏱ {route.duration}</span>}
+            {route.distance && <span>📏 {route.distance}</span>}
+          </div>
         )}
       </div>
-    </div>
+
+      {showDirections && fromStop && toStop && (
+        <DirectionsPicker
+          origin={{ lat: fromStop.lat, lng: fromStop.lng }}
+          destination={{ lat: toStop.lat, lng: toStop.lng }}
+          fromLabel={fromStop.label}
+          toLabel={toStop.label}
+          transportMode={route.transportMode}
+          onSelect={async (sel) => {
+            await onDirectionSelect(sel);
+            setShowDirections(false);
+          }}
+          onClose={() => setShowDirections(false)}
+        />
+      )}
+    </>
   );
 }

@@ -3,7 +3,6 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import './styles.css';
-import 'leaflet/dist/leaflet.css';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
@@ -17,7 +16,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <ConfirmProvider>
           <AuthProvider>
             <ThemeSync />
-            <BrowserRouter>
+            <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
               <App />
             </BrowserRouter>
           </AuthProvider>

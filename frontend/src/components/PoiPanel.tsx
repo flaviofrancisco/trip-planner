@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Calendar, Star, Trash2, X } from 'lucide-react';
+import { Calendar, MapPin, Star, Trash2, X } from 'lucide-react';
 import type { Attraction } from '../types';
 import {
   ATTRACTION_ICON_OPTIONS,
@@ -61,6 +61,7 @@ export function PoiPanel({
     if (!canEdit) return;
     const patch: Partial<Attraction> = {};
     if (draft.poiName !== attraction.poiName) patch.poiName = draft.poiName;
+    if (draft.address !== attraction.address) patch.address = draft.address;
     if (draft.notes !== attraction.notes) patch.notes = draft.notes;
     if (draft.cost !== attraction.cost) patch.cost = draft.cost;
     if (Object.keys(patch).length) save(patch);
@@ -109,7 +110,25 @@ export function PoiPanel({
       </div>
 
       <div>
+        <label className="label flex items-center gap-1">
+          <MapPin className="w-3.5 h-3.5" /> Address
+        </label>
+        <input
+          className="input text-sm"
+          placeholder="No address"
+          value={draft.address || ''}
+          onChange={(e) => setDraft({ ...draft, address: e.target.value })}
+          onBlur={onBlurField}
+          disabled={!canEdit}
+        />
+      </div>
+
+      <div>
         <label className="label">Coordinates</label>
+        <div className="text-xs text-slate-500 mb-1">
+          {Number(latInput).toFixed(4)}°{Number(latInput) >= 0 ? 'N' : 'S'},{' '}
+          {Number(lngInput).toFixed(4)}°{Number(lngInput) >= 0 ? 'E' : 'W'}
+        </div>
         <div className="grid grid-cols-2 gap-2">
           <input
             className="input"

@@ -6,6 +6,7 @@ import authRoutes from './routes/auth';
 import tripRoutes from './routes/trips';
 import userRoutes from './routes/users';
 import aiRoutes from './routes/ai';
+import directionsRoutes from './routes/directions';
 import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
@@ -22,6 +23,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/trips', tripRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/directions', directionsRoutes);
 
 app.use(errorHandler);
 

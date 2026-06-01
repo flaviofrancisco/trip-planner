@@ -6,7 +6,13 @@ export type TransportMode =
   | 'ferry'
   | 'bus'
   | 'car'
-  | 'metro';
+  | 'metro'
+  | 'transit'
+  | 'bicycle'
+  | 'motorcycle'
+  | 'tram'
+  | 'cablecar'
+  | 'funicular';
 
 export type ExpenseCategory =
   | 'breakfast'
@@ -39,6 +45,8 @@ export type AttractionIcon =
   | 'church'
   | 'zoo'
   | 'viewpoint'
+  | 'hotel'
+  | 'airbnb'
   | 'other';
 
 export type ReservationIcon =
@@ -62,6 +70,7 @@ export interface Attraction {
   id: string;
   attractionNumber: number;
   poiName: string;
+  address: string;
   coordinates: { lat: number; lng: number };
   notes: string;
   cost: number;
@@ -78,6 +87,9 @@ export interface IntraLeg {
   toAttractionId: string;
   transportMode: TransportMode;
   cost: number;
+  duration?: string;
+  distance?: string;
+  routePolyline?: string;
 }
 
 export interface City {
@@ -99,6 +111,9 @@ export interface InterLeg {
   toCityId: string;
   transportMode: TransportMode;
   cost: number;
+  duration?: string;
+  distance?: string;
+  routePolyline?: string;
 }
 
 export interface ShareEntry {

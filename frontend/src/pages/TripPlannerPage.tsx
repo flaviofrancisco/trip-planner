@@ -130,7 +130,7 @@ export function TripPlannerPage() {
 
   const updateInterLeg = async (
     legId: string,
-    patch: { transportMode?: TransportMode; cost?: number }
+    patch: { transportMode?: TransportMode; cost?: number; duration?: string | null; distance?: string | null; routePolyline?: string | null }
   ) => {
     try {
       const updated = await api.updateInterLeg(trip.id, legId, patch);
@@ -189,6 +189,7 @@ export function TripPlannerPage() {
     fromId: l.fromCityId,
     toId: l.toCityId,
     transportMode: l.transportMode,
+    routePolyline: l.routePolyline,
   }));
 
   return (
@@ -313,6 +314,8 @@ export function TripPlannerPage() {
                       id: c.id,
                       number: c.cityNumber,
                       label: c.name,
+                      lat: c.coordinates.lat,
+                      lng: c.coordinates.lng,
                     }))}
                     routes={trip.legs.map((l) => ({
                       id: l.id,
@@ -320,6 +323,9 @@ export function TripPlannerPage() {
                       toId: l.toCityId,
                       transportMode: l.transportMode,
                       cost: l.cost,
+                      duration: l.duration,
+                      distance: l.distance,
+                      routePolyline: l.routePolyline,
                     }))}
                     canEdit={canEdit}
                     currency={trip.currency || 'EUR'}
@@ -339,6 +345,7 @@ export function TripPlannerPage() {
             legs={legs}
             selectedMarkerId={selectedCityId}
             onSelectMarker={setSelectedCityId}
+            onMapDoubleClick={canEdit ? addCity : undefined}
           />
           <div className="absolute bottom-3 left-3 z-[400] max-w-[220px]">
             <MapLegend />

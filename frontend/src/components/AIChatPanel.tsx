@@ -145,7 +145,7 @@ export function AIChatPanel({
           <button
             className="btn-ghost text-xs"
             onClick={optimize}
-            disabled={busy || trip.steps.length < 3}
+            disabled={busy || trip.cities.length < 3}
             title="Nearest-neighbor reorder"
           >
             <Sparkles className="w-3.5 h-3.5" /> Optimize

@@ -239,6 +239,7 @@ router.post(
 // ---------- Attractions (within a city) ----------
 const attractionSchema = z.object({
   poiName: z.string().min(1),
+  address: z.string().optional(),
   coordinates: coordSchema,
   notes: z.string().optional(),
   cost: z.number().min(0).optional(),
@@ -371,14 +372,13 @@ const intraLegSchema = z.object({
   transportMode: z.enum(TRANSPORT_MODES),
   cost: z.number().min(0).optional(),
 });
-const intraLegPatchSchema = z
-  .object({
-    transportMode: z.enum(TRANSPORT_MODES).optional(),
-    cost: z.number().min(0).optional(),
-  })
-  .refine((d) => d.transportMode !== undefined || d.cost !== undefined, {
-    message: 'Provide transportMode and/or cost',
-  });
+const intraLegPatchSchema = z.object({
+  transportMode: z.enum(TRANSPORT_MODES).optional(),
+  cost: z.number().min(0).optional(),
+  duration: z.string().nullable().optional(),
+  distance: z.string().nullable().optional(),
+  routePolyline: z.string().nullable().optional(),
+});
 
 router.post(
   '/:tripId/cities/:cityId/legs',
@@ -435,6 +435,9 @@ router.patch(
       if (!leg) return res.status(404).json({ error: 'Leg not found' });
       if (patch.transportMode) leg.set('transportMode', patch.transportMode);
       if (patch.cost !== undefined) leg.set('cost', Number(patch.cost) || 0);
+      if (patch.duration !== undefined) leg.set('duration', patch.duration);
+      if (patch.distance !== undefined) leg.set('distance', patch.distance);
+      if (patch.routePolyline !== undefined) leg.set('routePolyline', patch.routePolyline);
       (access.trip as any).markModified('cities');
       await access.trip.save();
       res.json(await decorateTripForUser(access.trip, req.userId!));
@@ -473,14 +476,13 @@ const interLegSchema = z.object({
   transportMode: z.enum(TRANSPORT_MODES),
   cost: z.number().min(0).optional(),
 });
-const interLegPatchSchema = z
-  .object({
-    transportMode: z.enum(TRANSPORT_MODES).optional(),
-    cost: z.number().min(0).optional(),
-  })
-  .refine((d) => d.transportMode !== undefined || d.cost !== undefined, {
-    message: 'Provide transportMode and/or cost',
-  });
+const interLegPatchSchema = z.object({
+  transportMode: z.enum(TRANSPORT_MODES).optional(),
+  cost: z.number().min(0).optional(),
+  duration: z.string().nullable().optional(),
+  distance: z.string().nullable().optional(),
+  routePolyline: z.string().nullable().optional(),
+});
 
 router.post('/:tripId/legs', async (req: AuthRequest, res, next) => {
   try {
@@ -528,6 +530,9 @@ router.patch('/:tripId/legs/:legId', async (req: AuthRequest, res, next) => {
     if (!leg) return res.status(404).json({ error: 'Leg not found' });
     if (patch.transportMode) leg.set('transportMode', patch.transportMode);
     if (patch.cost !== undefined) leg.set('cost', Number(patch.cost) || 0);
+    if (patch.duration !== undefined) leg.set('duration', patch.duration);
+    if (patch.distance !== undefined) leg.set('distance', patch.distance);
+    if (patch.routePolyline !== undefined) leg.set('routePolyline', patch.routePolyline);
     (access.trip as any).markModified('legs');
     await access.trip.save();
     res.json(await decorateTripForUser(access.trip, req.userId!));

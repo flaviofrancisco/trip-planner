@@ -9,6 +9,12 @@ export const TRANSPORT_MODES = [
   'bus',
   'car',
   'metro',
+  'transit',
+  'bicycle',
+  'motorcycle',
+  'tram',
+  'cablecar',
+  'funicular',
 ] as const;
 export type TransportMode = (typeof TRANSPORT_MODES)[number];
 
@@ -25,6 +31,8 @@ export const ATTRACTION_ICONS = [
   'church',
   'zoo',
   'viewpoint',
+  'hotel',
+  'airbnb',
   'other',
 ] as const;
 
@@ -55,6 +63,7 @@ const attractionSchema = new Schema(
   {
     attractionNumber: { type: Number, required: true },
     poiName: { type: String, required: true, trim: true },
+    address: { type: String, default: '' },
     coordinates: {
       lat: { type: Number, required: true },
       lng: { type: Number, required: true },
@@ -78,6 +87,9 @@ const intraLegSchema = new Schema(
     toAttractionId: { type: Schema.Types.ObjectId, required: true },
     transportMode: { type: String, enum: TRANSPORT_MODES, required: true },
     cost: { type: Number, default: 0, min: 0 },
+    duration: { type: String, default: null },
+    distance: { type: String, default: null },
+    routePolyline: { type: String, default: null },
   },
   { _id: true }
 );
@@ -119,6 +131,9 @@ const interLegSchema = new Schema(
     toCityId: { type: Schema.Types.ObjectId, required: true },
     transportMode: { type: String, enum: TRANSPORT_MODES, required: true },
     cost: { type: Number, default: 0, min: 0 },
+    duration: { type: String, default: null },
+    distance: { type: String, default: null },
+    routePolyline: { type: String, default: null },
   },
   { _id: true }
 );

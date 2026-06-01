@@ -17,6 +17,12 @@ export const TRANSPORT_STYLES: Record<
   bus: { color: '#f97316', label: 'Bus', emoji: '🚌' },
   car: { color: '#111827', label: 'Rented Car', emoji: '🚗' },
   metro: { color: '#9333ea', label: 'Metro / Subway', emoji: '🚇' },
+  transit: { color: '#0891b2', label: 'Public Transport', emoji: '🚏' },
+  bicycle: { color: '#65a30d', label: 'Bicycle', emoji: '🚲' },
+  motorcycle: { color: '#b45309', label: 'Motorcycle', emoji: '🏍️' },
+  tram: { color: '#e11d48', label: 'Tram / Light Rail', emoji: '🚊' },
+  cablecar: { color: '#7c3aed', dashArray: '4 6', label: 'Cable Car', emoji: '🚡' },
+  funicular: { color: '#059669', dashArray: '4 6', label: 'Funicular', emoji: '🚞' },
 };
 
 export const EXPENSE_CATEGORY_OPTIONS: {
@@ -55,6 +61,8 @@ export const ATTRACTION_ICON_OPTIONS: { value: AttractionIcon; emoji: string; la
   { value: 'church', emoji: '⛪', label: 'Church' },
   { value: 'zoo', emoji: '🦁', label: 'Zoo' },
   { value: 'viewpoint', emoji: '🌄', label: 'Viewpoint' },
+  { value: 'hotel', emoji: '🏨', label: 'Hotel' },
+  { value: 'airbnb', emoji: '🏠', label: 'Airbnb' },
   { value: 'other', emoji: '📍', label: 'Other' },
 ];
 

@@ -1,20 +1,25 @@
 export async function geocode(query: string) {
-  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(
+  const key = process.env.GOOGLE_MAPS_API_KEY;
+  if (!key) throw new Error('GOOGLE_MAPS_API_KEY is not set');
+
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
     query
-  )}`;
-  const res = await fetch(url, {
-    headers: {
-      Accept: 'application/json',
-      'User-Agent': 'trip-planner/1.0 (https://example.local)',
-    },
-  });
+  )}&key=${key}`;
+  const res = await fetch(url);
   if (!res.ok) throw new Error('Geocoding failed');
-  const data = (await res.json()) as Array<{
-    lat: string;
-    lon: string;
-    display_name: string;
-  }>;
-  if (data.length === 0) return null;
-  const r = data[0];
-  return { lat: Number(r.lat), lng: Number(r.lon), label: r.display_name };
+
+  const data = (await res.json()) as {
+    status: string;
+    results: Array<{
+      geometry: { location: { lat: number; lng: number } };
+      formatted_address: string;
+    }>;
+  };
+  if (data.status !== 'OK' || data.results.length === 0) return null;
+  const r = data.results[0];
+  return {
+    lat: r.geometry.location.lat,
+    lng: r.geometry.location.lng,
+    label: r.formatted_address,
+  };
 }
