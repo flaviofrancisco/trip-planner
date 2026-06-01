@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { X, Clock, Ruler, Banknote, Route, Loader2 } from 'lucide-react';
+import { X, Clock, Ruler, Banknote, Route, Loader2, ExternalLink } from 'lucide-react';
 import { api } from '../api';
 import { TRANSPORT_STYLES } from '../constants';
 import type { TransportMode } from '../types';
@@ -34,6 +34,39 @@ export interface DirectionSelection {
   distance: string;
   cost?: number;
   routePolyline: string;
+}
+
+// Map our transport modes to Google Maps deep-link travelmode values
+const GOOGLE_TRAVELMODE: Partial<Record<TransportMode, string>> = {
+  train: 'transit',
+  bus: 'transit',
+  metro: 'transit',
+  ferry: 'transit',
+  transit: 'transit',
+  tram: 'transit',
+  cablecar: 'transit',
+  funicular: 'transit',
+  foot: 'walking',
+  bicycle: 'bicycling',
+  taxi: 'driving',
+  car: 'driving',
+  motorcycle: 'driving',
+};
+
+/** Build a Google Maps directions deep-link for modes our API can't resolve (e.g. Japanese transit). */
+function googleMapsDirectionsUrl(
+  origin: { lat: number; lng: number },
+  destination: { lat: number; lng: number },
+  transportMode: TransportMode,
+): string {
+  const params = new URLSearchParams({
+    api: '1',
+    origin: `${origin.lat},${origin.lng}`,
+    destination: `${destination.lat},${destination.lng}`,
+  });
+  const travelmode = GOOGLE_TRAVELMODE[transportMode];
+  if (travelmode) params.set('travelmode', travelmode);
+  return `https://www.google.com/maps/dir/?${params.toString()}`;
 }
 
 export function DirectionsPicker({
@@ -79,6 +112,8 @@ export function DirectionsPicker({
         if (cancelled) return;
         if (res.routes.length === 0) {
           setError(res.message || 'No routes found');
+        } else if (res.message) {
+          setError(res.message);
         }
         setRoutes(res.routes);
       } catch (e: any) {
@@ -117,15 +152,27 @@ export function DirectionsPicker({
           )}
 
           {!loading && error && (
-            <div className="text-center py-4 space-y-2">
-              <div className="text-sm text-red-600">{error}</div>
-              <button
-                type="button"
-                className="btn-secondary text-xs"
-                onClick={fetchDirections}
-              >
-                Retry
-              </button>
+            <div className={`text-center ${routes.length > 0 ? 'py-2' : 'py-4'} space-y-2`}>
+              <div className={`text-sm ${routes.length > 0 ? 'text-amber-600' : 'text-red-600'}`}>{error}</div>
+              {routes.length === 0 && (
+                <div className="flex items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    className="btn-secondary text-xs"
+                    onClick={fetchDirections}
+                  >
+                    Retry
+                  </button>
+                  <a
+                    href={googleMapsDirectionsUrl(origin, destination, transportMode)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-secondary text-xs inline-flex items-center gap-1"
+                  >
+                    <ExternalLink className="w-3 h-3" /> Open in Google Maps
+                  </a>
+                </div>
+              )}
             </div>
           )}
 

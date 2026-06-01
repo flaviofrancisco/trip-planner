@@ -78,12 +78,16 @@ router.get('/', async (req, res, next) => {
         location: { latLng: { latitude: dLat, longitude: dLng } },
       },
       travelMode,
-      // TRANSIT does not support alternative routes or routeModifiers,
-      // but requires a departureTime
-      ...(isTransit
-        ? { departureTime: new Date(Date.now() + 5 * 60_000).toISOString() }
-        : { computeAlternativeRoutes: true, routeModifiers: {} }),
+      computeAlternativeRoutes: true,
     };
+
+    if (isTransit) {
+      // Transit requires a departure time; does not support alternativeRoutes or routeModifiers
+      body.departureTime = new Date(Date.now() + 5 * 60_000).toISOString();
+      delete body.computeAlternativeRoutes;
+    } else {
+      body.routeModifiers = {};
+    }
 
     // Routes API uses a field mask — certain fields are only valid for specific travel modes
     const commonFields = [
@@ -113,11 +117,12 @@ router.get('/', async (req, res, next) => {
     ].join(',');
 
     const url = 'https://routes.googleapis.com/directions/v2:computeRoutes';
-    const headers = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'X-Goog-Api-Key': key,
       'X-Goog-FieldMask': fieldMask,
     };
+
     const payload = JSON.stringify(body);
 
     // Retry with exponential backoff for transient errors (rate limits, temporary blocks)
@@ -127,7 +132,6 @@ router.get('/', async (req, res, next) => {
       const gRes = await fetch(url, { method: 'POST', headers, body: payload });
       gData = await gRes.json();
 
-      // Retry on transient errors: REQUEST_DENIED, RESOURCE_EXHAUSTED, 429, 503
       const status = gData.error?.status;
       const code = gData.error?.code;
       const isTransient = status === 'REQUEST_DENIED'
@@ -137,20 +141,21 @@ router.get('/', async (req, res, next) => {
 
       if (!gData.error || !isTransient || attempt === MAX_RETRIES) break;
 
-      // Wait before retrying: 500ms, 1500ms, 3500ms
       await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt)));
     }
 
     if (gData.error) {
       console.error('[Directions] Routes API error:', JSON.stringify(gData.error, null, 2));
-      console.error('[Directions] Request body was:', JSON.stringify(body, null, 2));
       return res.json({ routes: [], message: gData.error.message || 'Routes API error' });
     }
 
     if (!gData.routes || gData.routes.length === 0) {
-      console.log('[Directions] No routes found. Raw response:', JSON.stringify(gData).slice(0, 500));
-      console.log('[Directions] Request body was:', JSON.stringify(body, null, 2));
-      return res.json({ routes: [], message: 'No routes found' });
+      // Transit coverage via the Routes API is region-limited — notably, Japanese
+      // rail/transit is not served, even though the consumer Maps site shows it.
+      const message = isTransit
+        ? 'Transit directions are not available for this route. Google\'s public transit API has limited regional coverage — some areas (e.g. Japan) are not supported. Use the link below to check Google Maps directly.'
+        : 'No routes found';
+      return res.json({ routes: [], message });
     }
 
     const routes = gData.routes.map((r: any) => {
@@ -172,7 +177,7 @@ router.get('/', async (req, res, next) => {
 
       // Extract transit steps with line/vehicle details
       const transitSteps: any[] = [];
-      if (leg?.steps) {
+      if (isTransit && leg?.steps) {
         for (const step of leg.steps) {
           if (step.travelMode === 'TRANSIT' && step.transitDetails) {
             const td = step.transitDetails;

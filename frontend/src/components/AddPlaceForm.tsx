@@ -34,88 +34,57 @@ export function AddPlaceForm({
   const [coordName, setCoordName] = useState('');
   const [error, setError] = useState('');
   const [locating, setLocating] = useState(false);
+  const [autocompleteReady, setAutocompleteReady] = useState(false);
   const autocompleteContainerRef = useRef<HTMLDivElement>(null);
   const autocompleteInitRef = useRef(false);
   const onAddRef = useRef(onAdd);
   onAddRef.current = onAdd;
 
-  // Set up Google Places Autocomplete — tries new PlaceAutocompleteElement first,
-  // falls back to legacy Autocomplete if not available
+  // Set up Google Places Autocomplete using PlaceAutocompleteElement
   useEffect(() => {
     if (mode !== 'search') return;
     const container = autocompleteContainerRef.current;
     if (!container || autocompleteInitRef.current) return;
-    if (typeof google === 'undefined' || !google.maps?.places) return;
 
-    autocompleteInitRef.current = true;
+    async function init() {
+      if (typeof google === 'undefined' || !google.maps) return false;
 
-    // Try the new PlaceAutocompleteElement API
-    const PlaceAC = (google.maps.places as any).PlaceAutocompleteElement;
-    if (PlaceAC) {
-      setupNewAutocomplete(container, PlaceAC);
-    } else {
-      // Fallback: try importing the library dynamically
-      google.maps.importLibrary('places').then((lib: any) => {
-        if (lib.PlaceAutocompleteElement) {
-          setupNewAutocomplete(container, lib.PlaceAutocompleteElement);
-        } else {
-          setupLegacyAutocomplete(container);
-        }
-      }).catch(() => {
-        setupLegacyAutocomplete(container);
-      });
-    }
+      autocompleteInitRef.current = true;
 
-    function setupNewAutocomplete(el: HTMLDivElement, PlaceAutocompleteElement: any) {
-      const acElement = new PlaceAutocompleteElement();
-      el.innerHTML = '';
-      el.appendChild(acElement);
+      try {
+        const { PlaceAutocompleteElement } = (await google.maps.importLibrary('places')) as any;
 
-      acElement.addEventListener('gmp-placeselect', async (evt: any) => {
-        const place = evt.place;
-        if (!place) return;
+        const acElement = new PlaceAutocompleteElement();
+        container!.innerHTML = '';
+        container!.appendChild(acElement);
+        setAutocompleteReady(true);
 
-        try {
+        acElement.addEventListener('gmp-select', async ({ placePrediction }: any) => {
+          if (!placePrediction) return;
+
+          const place = placePrediction.toPlace();
           await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location'] });
-        } catch {
-          return;
-        }
 
-        const location = place.location;
-        if (!location) return;
+          const location = place.location;
+          if (!location) return;
 
-        const lat = location.lat();
-        const lng = location.lng();
-        const name = place.displayName || place.formattedAddress?.split(',')[0] || 'Unnamed';
-        const address = place.formattedAddress || '';
+          const lat = typeof location.lat === 'function' ? location.lat() : location.lat;
+          const lng = typeof location.lng === 'function' ? location.lng() : location.lng;
+          const name = (typeof place.displayName === 'string' ? place.displayName : place.displayName?.text)
+            || place.formattedAddress?.split(',')[0] || 'Unnamed';
+          const address = place.formattedAddress || '';
 
-        onAddRef.current({ name, address, coordinates: { lat, lng } }).catch(() => {});
-      });
+          onAddRef.current({ name, address, coordinates: { lat, lng } }).catch(() => {});
+        });
+      } catch (e) {
+        console.warn('[AddPlaceForm] PlaceAutocompleteElement failed, using geocode fallback:', e);
+        autocompleteInitRef.current = false;
+      }
+
+      return true;
     }
 
-    function setupLegacyAutocomplete(el: HTMLDivElement) {
-      // Create an input element for the legacy Autocomplete
-      const input = document.createElement('input');
-      input.className = 'input';
-      input.placeholder = searchPlaceholder;
-      el.innerHTML = '';
-      el.appendChild(input);
-
-      const ac = new google.maps.places.Autocomplete(input, {
-        fields: ['geometry', 'name', 'formatted_address'],
-      });
-
-      ac.addListener('place_changed', () => {
-        const place = ac.getPlace();
-        if (!place.geometry?.location) return;
-        const lat = place.geometry.location.lat();
-        const lng = place.geometry.location.lng();
-        const name = place.name || place.formatted_address?.split(',')[0] || 'Unnamed';
-        const address = place.formatted_address || '';
-        onAddRef.current({ name, address, coordinates: { lat, lng } }).catch(() => {});
-        input.value = '';
-      });
-    }
+    init();
 
     return () => {
       autocompleteInitRef.current = false;
@@ -258,19 +227,21 @@ export function AddPlaceForm({
         <>
           {/* Google Places Autocomplete */}
           <div ref={autocompleteContainerRef} className="place-autocomplete-wrapper mb-2" />
-          {/* Manual geocode search as fallback */}
-          <form onSubmit={doSearch} className="flex gap-1">
-            <input
-              className="input"
-              placeholder={searchPlaceholder}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              disabled={disabled}
-            />
-            <button className="btn-primary" disabled={disabled || searching}>
-              <Search className="w-4 h-4" />
-            </button>
-          </form>
+          {/* Manual geocode search as fallback when autocomplete is not available */}
+          {!autocompleteReady && (
+            <form onSubmit={doSearch} className="flex gap-1">
+              <input
+                className="input"
+                placeholder={searchPlaceholder}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                disabled={disabled}
+              />
+              <button className="btn-primary" disabled={disabled || searching}>
+                <Search className="w-4 h-4" />
+              </button>
+            </form>
+          )}
           {results.length > 0 && (
             <ul className="mt-2 max-h-48 overflow-y-auto space-y-1 scrollbar-thin">
               {results.map((r, i) => (
