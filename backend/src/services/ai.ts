@@ -2,7 +2,7 @@ import OpenAI from 'openai';
 import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import { TRIP_TOOLS, executeTool, ToolDef } from './tripTools';
 
-export type AIProvider = 'openai' | 'gemini';
+export type AIProvider = 'openai' | 'gemini' | 'ollama';
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -11,6 +11,9 @@ export interface ChatMessage {
 export const GEMINI_MODELS = ['gemini-2.5-pro', 'gemini-2.5-flash'] as const;
 export type GeminiModel = (typeof GEMINI_MODELS)[number];
 export const DEFAULT_GEMINI_MODEL: GeminiModel = 'gemini-2.5-flash';
+export const OLLAMA_MODELS = ['ollama-model1', 'ollama-model2'] as const;
+export type OllamaModel = (typeof OLLAMA_MODELS)[number];
+export const DEFAULT_OLLAMA_MODEL: OllamaModel = 'ollama-model1';
 
 export interface ChatRunResult {
   reply: string;
@@ -33,7 +36,9 @@ export async function runChat(
   model?: string
 ): Promise<ChatRunResult> {
   if (provider === 'openai') return runOpenAI(apiKey, tripId, messages);
-  return runGemini(apiKey, tripId, messages, model);
+  if (provider === 'gemini') return runGemini(apiKey, tripId, messages, model);
+  if (provider === 'ollama') return runOllama(apiKey, tripId, messages, model);
+  throw new Error(`Unsupported AI provider: ${provider}`);
 }
 
 // --- OpenAI ---
@@ -207,6 +212,19 @@ async function runGemini(
     return { reply: text, toolCalls };
   }
   return { reply: '(stopped after maximum tool rounds)', toolCalls };
+async function runOllama(
+  apiKey: string,
+  tripId: string,
+  messages: ChatMessage[],
+  modelName?: string
+): Promise<ChatRunResult> {
+  // Placeholder for Ollama implementation
+  const chosenModel: string =
+    modelName && (OLLAMA_MODELS as readonly string[]).includes(modelName)
+      ? modelName
+      : DEFAULT_OLLAMA_MODEL;
+  // Implement Ollama API call here
+  return { reply: 'Ollama response', toolCalls: [] };
 }
 
 // --- Translate ---

@@ -6,9 +6,13 @@ import {
   type ChatMessage,
   type Trip,
   type GeminiModel,
+  type OllamaModel,
   GEMINI_MODELS,
   GEMINI_MODEL_LABELS,
   DEFAULT_GEMINI_MODEL,
+  OLLAMA_MODELS,
+  OLLAMA_MODEL_LABELS,
+  DEFAULT_OLLAMA_MODEL,
 } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -25,10 +29,9 @@ export function AIChatPanel({
 }) {
   const { user } = useAuth();
   const toast = useToast();
-  const [provider, setProvider] = useState<AIProvider>('openai');
-  const [geminiModel, setGeminiModel] = useState<GeminiModel>(
-    DEFAULT_GEMINI_MODEL
-  );
+  const [provider, setProvider] = useState<AIProvider>('openai' | 'ollama');
+  const [geminiModel, setGeminiModel] = useState<GeminiModel>(DEFAULT_GEMINI_MODEL);
+  const [ollamaModel, setOllamaModel] = useState<OllamaModel>(DEFAULT_OLLAMA_MODEL);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -127,7 +130,24 @@ export function AIChatPanel({
             <option value="gemini">
               Gemini {hasKey('gemini') ? '' : '(no key)'}
             </option>
+            <option value="ollama">
+              Ollama {hasKey('ollama') ? '' : '(no key)'}
+            </option>
           </select>
+          {provider === 'ollama' && (
+            <select
+              className="input py-1 text-xs"
+              value={ollamaModel}
+              onChange={(e) => setOllamaModel(e.target.value as OllamaModel)}
+              title="Ollama model"
+            >
+              {OLLAMA_MODELS.map((m) => (
+                <option key={m} value={m}>
+                  {OLLAMA_MODEL_LABELS[m]}
+                </option>
+              ))}
+            </select>
+          )}
           {provider === 'gemini' && (
             <select
               className="input py-1 text-xs"
