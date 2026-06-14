@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { Client as OllamaClient } from 'ollama-sdk';
 import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import { TRIP_TOOLS, executeTool, ToolDef } from './tripTools';
 
@@ -218,13 +219,53 @@ async function runOllama(
   messages: ChatMessage[],
   modelName?: string
 ): Promise<ChatRunResult> {
-  // Placeholder for Ollama implementation
   const chosenModel: string =
     modelName && (OLLAMA_MODELS as readonly string[]).includes(modelName)
       ? modelName
       : DEFAULT_OLLAMA_MODEL;
-  // Implement Ollama API call here
-  return { reply: 'Ollama response', toolCalls: [] };
+
+  const client = new OllamaClient({ apiKey });
+  const toolCalls: ChatRunResult['toolCalls'] = [];
+  const systemPrompt = SYSTEM_PROMPT;
+  const userMessages = messages.map((m) => m.content).join('\n');
+
+  try {
+    const response = await client.chat({
+      model: chosenModel,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessages },
+      ],
+      tools: TRIP_TOOLS.map((t) => ({
+        name: t.name,
+        description: t.description,
+        parameters: t.parameters,
+      })),
+    });
+
+    if (response.tool_calls && response.tool_calls.length > 0) {
+      for (const call of response.tool_calls) {
+        let args: any = {};
+        try {
+          args = JSON.parse(call.arguments || '{}');
+        } catch {}
+        let result: any;
+        let error: string | undefined;
+        try {
+          result = await executeTool(tripId, call.name, args);
+        } catch (e: any) {
+          error = e.message || String(e);
+          result = { error };
+        }
+        toolCalls.push({ name: call.name, args, result, error });
+      }
+    }
+
+    return { reply: response.reply, toolCalls };
+  } catch (error) {
+    console.error('Error calling Ollama API:', error);
+    return { reply: 'Failed to get a response from Ollama', toolCalls };
+  }
 }
 
 // --- Translate ---
