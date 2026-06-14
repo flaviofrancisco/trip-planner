@@ -24,7 +24,7 @@ Built end-to-end against the PRD in [`trip-planner.md`](./trip-planner.md).
 | Layer | Tech |
 |---|---|
 | **Frontend** | React 18 · TypeScript · Vite · Tailwind CSS · Google Maps JS API · `@dnd-kit` · `lucide-react` · `xlsx` |
-| **Backend** | Node.js · Express · TypeScript · Mongoose · JWT (bcrypt + zod) · OpenAI SDK · Google Generative AI SDK |
+| **Backend** | Node.js · Express · TypeScript · Mongoose · JWT (bcrypt + zod) · Nodemailer · OpenAI SDK · Google Generative AI SDK |
 | **Database** | MongoDB 7 |
 | **Maps & Geocoding** | Google Maps JavaScript API · Google Places Autocomplete · Google Geocoding API · Google Routes API v2 |
 | **Runtime** | Docker + Docker Compose |
@@ -42,6 +42,9 @@ cp .env.example .env
 # 2. Edit .env and fill in:
 #    - JWT_SECRET with a long random string (e.g. `openssl rand -hex 48`)
 #    - GOOGLE_MAPS_API_KEY and VITE_GOOGLE_MAPS_API_KEY with your Google Maps API key
+#    - (optional) SMTP_* and EMAIL_FROM for real email delivery
+#      Without SMTP, dev mode logs reset links / sign-in codes to the backend console
+#      and returns them in the API response for local testing.
 
 # 3. Build and start everything
 make rebuild
@@ -68,6 +71,21 @@ Set the same key in `.env` as both `GOOGLE_MAPS_API_KEY` (backend) and `VITE_GOO
 
 After signing up, click the **Settings** button in the header to add your OpenAI and/or Gemini API keys (stored per-user in the DB). At least one is required for the AI agent and voice translator.
 
+### Email (password reset & sign-in codes)
+
+Credential reset and passwordless sign-in use email. Configure SMTP in `.env` for production-like behavior:
+
+| Variable | Purpose |
+|---|---|
+| `FRONTEND_URL` | Base URL for reset links (default `http://localhost:3000`) |
+| `SMTP_HOST` | SMTP server hostname |
+| `SMTP_PORT` | SMTP port (default `587`) |
+| `SMTP_SECURE` | `true` for TLS on connect (e.g. port 465) |
+| `SMTP_USER` / `SMTP_PASS` | SMTP credentials (optional for open relays) |
+| `EMAIL_FROM` | From address (default `noreply@tripplanner.local`) |
+
+When `SMTP_HOST` is unset in development, the backend logs reset URLs and 6-digit sign-in codes to the console and surfaces them in the UI/API response (`devResetUrl`, `devLoginCode`) so you can test without a mail server.
+
 Source under `frontend/src` and `backend/src` is bind-mounted into the containers, so edits hot-reload.
 
 ---
@@ -80,6 +98,8 @@ This project handles secrets (JWT signing key, third-party API keys). The repo i
 - 🔒 **`.env.example`** ships placeholder values only — never commit a real `.env`.
 - 🔒 **User API keys** (OpenAI / Gemini) are stored per-user in MongoDB and stripped from all JSON responses (the API returns booleans like `{ openai: true }`, never the key itself).
 - 🔒 **Passwords** are bcrypt-hashed; the schema never returns the hash.
+- 🔒 **Reset tokens and sign-in codes** are stored as SHA-256 hashes with short TTLs (1 h / 10 min); raw values only appear in email or dev-mode responses.
+- 🔒 **Forgot-password and login-code endpoints** return generic messages whether or not the email exists, to reduce account enumeration.
 
 ### Before your first commit
 
@@ -120,12 +140,17 @@ Rotate it immediately (regenerate `JWT_SECRET`, revoke API keys), then purge it 
 
 > The `clean` step exists because this project lives on a FAT/exFAT volume. macOS writes a `._<file>` AppleDouble companion for every file with extended attributes, and BuildKit's context loader fails with `failed to xattr ... operation not permitted` when it tries to tar them. `clean` strips them before each build.
 
+Equivalent npm scripts (same cleanup via `scripts/compose.sh`): `npm run docker:up`, `npm run docker:build`, `npm run docker:rebuild`.
+
 ---
 
 ## Features
 
 ### Auth & sharing
 - Email/password signup & login (JWT, bcrypt-hashed passwords).
+- **Passwordless sign-in** — request a 6-digit code by email, enter it on the login page (10-minute expiry).
+- **Forgot credentials** — request a reset link; confirm email and set a new password without knowing the old one (1-hour link expiry).
+- Dev mode without SMTP: reset links and sign-in codes appear in the UI and backend logs for local testing.
 - Share any trip with another registered user by email at one of two permission levels:
   - **Viewer** — read-only access
   - **Editor** — full add / modify / delete rights
@@ -168,7 +193,7 @@ A legend is rendered on the map.
 - Route info persists across sessions — the polyline and metadata are stored on the leg.
 
 ### AI travel agent
-Chat panel embedded in the trip page (right sidebar). Pick the provider per-request: **OpenAI `gpt-4o-mini`** or **Gemini `gemini-1.5-flash`**.
+Chat panel embedded in the trip page (right sidebar). Pick the provider per-request: **OpenAI `gpt-4o-mini`**, **Gemini `gemini-2.5-flash`** / **`gemini-2.5-pro`**, or **Ollama** (placeholder — returns a “not configured” message until a local server integration is wired up).
 
 The agent has **write access** through function calling:
 
@@ -216,7 +241,7 @@ trip-planner/
 │       ├── middleware/             # auth + errorHandler
 │       ├── models/                 # User (apiKeys, prefs), Trip (cities, legs, expenses)
 │       ├── routes/                 # auth, users, trips, ai, directions
-│       └── services/              # ai, tripTools, optimizer, geocode
+│       └── services/              # ai, email, tripTools, optimizer, geocode
 └── frontend/
     ├── Dockerfile · package.json · tailwind.config.js · vite.config.ts
     ├── index.html                  # Loads Google Maps JS API
@@ -230,7 +255,8 @@ trip-planner/
         │                           # CitiesList, CityDetailPanel, RoutesList,
         │                           # TabbedPanel, ExpensesPanel, SharePanel,
         │                           # AIChatPanel, VoiceTranslator
-        └── pages/                  # LoginPage, SignupPage, TripsPage,
+        └── pages/                  # LoginPage, SignupPage, ForgotPasswordPage,
+                                    # ResetCredentialsPage, TripsPage,
                                     # TripPlannerPage, CityPlannerPage
 ```
 
@@ -244,6 +270,11 @@ All routes except `/api/auth/*` require `Authorization: Bearer <jwt>`.
 |---|---|---|
 | POST | `/api/auth/signup` | `{ token, user }` |
 | POST | `/api/auth/login` | `{ token, user }` |
+| POST | `/api/auth/request-login-code` | `{ email }` → `{ message, devLoginCode? }` |
+| POST | `/api/auth/verify-login-code` | `{ email, code }` → `{ token, user }` |
+| POST | `/api/auth/forgot-password` | `{ email }` → `{ message, devResetUrl? }` |
+| GET | `/api/auth/verify-reset-token` | `?token=` → `{ valid, email }` (masked) |
+| POST | `/api/auth/set-credentials` | `{ token, password }` → `{ message }` |
 | GET | `/api/users/me` | Current user (apiKeys returned as booleans) |
 | PATCH | `/api/users/me` | Update name, `preferences.theme`, `apiKeys.{openai,gemini}` |
 | GET | `/api/trips` | List my + shared trips |
@@ -283,6 +314,8 @@ All routes except `/api/auth/*` require `Authorization: Bearer <jwt>`.
 ## Notes & limitations
 
 - `JWT_SECRET` defaults to `change-me-in-prod` in `docker-compose.yml` — set it via `.env` for anything beyond local hacking.
+- **Email is optional in dev.** Without `SMTP_HOST`, password-reset links and sign-in codes are logged and returned in API responses; configure SMTP before deploying.
+- The **Ollama** provider is a UI/backend stub only — it does not call a local Ollama server yet.
 - API keys live on the user document in MongoDB; the schema strips them from responses but **does not encrypt at rest**. Wrap them with KMS for production.
 - **Google Maps API key** is required. Enable Maps JavaScript API, Places API, Geocoding API, and Routes API in your Google Cloud project. The same key is used by both frontend and backend.
 - Voice recognition relies on the Web Speech API and works best in Chrome / Edge. Translation and TTS work in all modern browsers.

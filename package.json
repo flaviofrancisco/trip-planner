@@ -1,0 +1,12 @@
+{
+  "scripts": {
+    "clean:macos": "find . -name '._*' -not -path './.git/*' -delete",
+    "dc": "bash scripts/compose.sh",
+    "docker:build": "npm run dc -- build",
+    "docker:up": "npm run dc -- up -d",
+    "docker:rebuild": "npm run dc -- up -d --build"
+  },
+  "dependencies": {
+    "ollama-sdk": "^1.0.0"
+  }
+}

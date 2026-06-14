@@ -54,6 +54,30 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     }),
+  forgotPassword: (email: string) =>
+    request<{ message: string; devResetUrl?: string }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+  verifyResetToken: (token: string) =>
+    request<{ valid: boolean; email: string }>(
+      `/auth/verify-reset-token?token=${encodeURIComponent(token)}`
+    ),
+  setCredentials: (token: string, password: string) =>
+    request<{ message: string }>('/auth/set-credentials', {
+      method: 'POST',
+      body: JSON.stringify({ token, password }),
+    }),
+  requestLoginCode: (email: string) =>
+    request<{ message: string; devLoginCode?: string }>('/auth/request-login-code', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+  verifyLoginCode: (email: string, code: string) =>
+    request<{ token: string; user: User }>('/auth/verify-login-code', {
+      method: 'POST',
+      body: JSON.stringify({ email, code }),
+    }),
   me: () => request<User>('/users/me'),
   updateMe: (data: {
     name?: string;

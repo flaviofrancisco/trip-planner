@@ -67,3 +67,4 @@ ehthumbs.db
 mongo-data/
 data/
 .claude/
+.aider*

@@ -62,7 +62,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  apiKeys?: { openai: boolean; gemini: boolean };
+  apiKeys?: { openai: boolean; gemini: boolean; ollama?: boolean };
   preferences?: { theme: 'light' | 'dark' | 'system' };
 }
 
@@ -149,7 +149,7 @@ export interface TripSummary {
   updatedAt: string;
 }
 
-export type AIProvider = 'openai' | 'gemini';
+export type AIProvider = 'openai' | 'gemini' | 'ollama';
 
 export const GEMINI_MODELS = ['gemini-2.5-pro', 'gemini-2.5-flash'] as const;
 export type GeminiModel = (typeof GEMINI_MODELS)[number];
@@ -158,6 +158,14 @@ export const GEMINI_MODEL_LABELS: Record<GeminiModel, string> = {
   'gemini-2.5-flash': 'Gemini 2.5 Flash (free tier)',
 };
 export const DEFAULT_GEMINI_MODEL: GeminiModel = 'gemini-2.5-flash';
+
+export const OLLAMA_MODELS = ['ollama-model1', 'ollama-model2'] as const;
+export type OllamaModel = (typeof OLLAMA_MODELS)[number];
+export const OLLAMA_MODEL_LABELS: Record<OllamaModel, string> = {
+  'ollama-model1': 'Ollama Model 1',
+  'ollama-model2': 'Ollama Model 2',
+};
+export const DEFAULT_OLLAMA_MODEL: OllamaModel = 'ollama-model1';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
