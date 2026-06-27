@@ -327,4 +327,4 @@ All routes except `/api/auth/*` require `Authorization: Bearer <jwt>`.
 
 ## License
 
-Private / unpublished.
+CC-4.0 BY
